@@ -10,9 +10,9 @@ import com.amazonaws.services.ecs.model.CreateClusterResult;
 
 import com.amazonaws.services.ecs.model.DescribeClustersRequest;
 import com.beust.jcommander.JCommander;
-
 import com.beust.jcommander.Parameter;
-import com.sun.tools.javac.util.List;
+
+import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -27,42 +27,51 @@ public class MQSpec {
     static final Logger logger = LoggerFactory.getLogger(MQSpec.class);
 
     @Parameter(names = { "--instances" }, description = "Instances of mq containers")
-    int instances = 1;
+    int instances = 3;
     @Parameter(names = { "--storage" }, description = "Storage in GiB for each mq container")
     int gibStoragePerNode = 10;
     @Parameter(names = { "--cluster" }, description = "Cluster name")
     String clusterName = "j-sumeet";
-
-    AmazonECS ecs;
+    @Parameter(names = { "--recipe" }, description = "Recipe to use")
+    String recipeName = "recipe1";
 
     public static void main(String... args) {
         MQSpec spec = new MQSpec();
         new JCommander(spec, args);
 
-        spec.ecs = AmazonECSClientBuilder
+        AmazonECS ecs = AmazonECSClientBuilder
                 .standard()
                 .withCredentials(new ProfileCredentialsProvider())
                 .withRegion(Regions.US_WEST_1).build();
 
-        spec.runRecipe1();
+        Recipe recipe = null;
+        switch(spec.recipeName) {
+            case "recipe1":
+            default:
+                logger.debug("running recipe1");
+                recipe = new Recipe1(spec, ecs);
+        }
+
+        Cluster cluster = recipe.buildCluster();
+        List<String> zkIps = recipe.bootZooKeeper(cluster);
+        recipe.bootKafka(cluster, zkIps);
+    }
+}
+
+class Recipe1 implements Recipe {
+    static final Logger logger = LoggerFactory.getLogger(Recipe1.class);
+    private final MQSpec spec;
+    private final AmazonECS ecs;
+
+    Recipe1(MQSpec spec, AmazonECS ecs) {
+        this.spec = spec;
+        this.ecs = ecs;
     }
 
-    void runRecipe1() {
-        Cluster cluster = buildCluster();
+    public Cluster buildCluster() {
+        logger.debug("finding cluster: {}", spec.clusterName);
 
-        List<String> zkIps = bootZooKeeper(cluster);
-
-        bootKafka(cluster, zkIps);
-    }
-
-    private void bootKafka(Cluster cluster, List<String> zkIps) {
-
-    }
-
-    Cluster buildCluster() {
-        logger.debug("finding cluster: {}", clusterName);
-
-        DescribeClustersRequest describe = new DescribeClustersRequest().withClusters(clusterName);
+        DescribeClustersRequest describe = new DescribeClustersRequest().withClusters(spec.clusterName);
 
         Optional<Cluster> cluster = ecs.describeClusters(describe)
                 .getClusters()
@@ -70,9 +79,9 @@ public class MQSpec {
                 .findAny();
 
         if (!cluster.isPresent()) {
-            logger.info("creating cluster {}", clusterName);
+            logger.info("creating cluster {}", spec.clusterName);
 
-            CreateClusterRequest request = new CreateClusterRequest().withClusterName(clusterName);
+            CreateClusterRequest request = new CreateClusterRequest().withClusterName(spec.clusterName);
 
             CreateClusterResult result = ecs.createCluster(request);
             cluster = Optional.of(result.getCluster());
@@ -83,7 +92,11 @@ public class MQSpec {
         return cluster.get();
     }
 
-    private List<String> bootZooKeeper(Cluster cluster) {
+    public List<String> bootZooKeeper(Cluster cluster) {
         return null;
+    }
+
+    public void bootKafka(Cluster cluster, List<String> zkIps) {
+
     }
 }
