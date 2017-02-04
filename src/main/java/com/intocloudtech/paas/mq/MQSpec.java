@@ -4,11 +4,8 @@ import com.amazonaws.auth.profile.ProfileCredentialsProvider;
 import com.amazonaws.regions.Regions;
 import com.amazonaws.services.ecs.AmazonECS;
 import com.amazonaws.services.ecs.AmazonECSClientBuilder;
-import com.amazonaws.services.ecs.model.Cluster;
-import com.amazonaws.services.ecs.model.CreateClusterRequest;
-import com.amazonaws.services.ecs.model.CreateClusterResult;
+import com.amazonaws.services.ecs.model.*;
 
-import com.amazonaws.services.ecs.model.DescribeClustersRequest;
 import com.beust.jcommander.JCommander;
 import com.beust.jcommander.Parameter;
 
@@ -39,17 +36,12 @@ public class MQSpec {
         MQSpec spec = new MQSpec();
         new JCommander(spec, args);
 
-        AmazonECS ecs = AmazonECSClientBuilder
-                .standard()
-                .withCredentials(new ProfileCredentialsProvider())
-                .withRegion(Regions.US_WEST_1).build();
-
         Recipe recipe = null;
         switch(spec.recipeName) {
             case "recipe1":
             default:
                 logger.debug("running recipe1");
-                recipe = new Recipe1(spec, ecs);
+                recipe = new Recipe1(spec);
         }
 
         Cluster cluster = recipe.buildCluster();
@@ -63,9 +55,12 @@ class Recipe1 implements Recipe {
     private final MQSpec spec;
     private final AmazonECS ecs;
 
-    Recipe1(MQSpec spec, AmazonECS ecs) {
+    Recipe1(MQSpec spec) {
         this.spec = spec;
-        this.ecs = ecs;
+        this.ecs = AmazonECSClientBuilder
+                .standard()
+                .withCredentials(new ProfileCredentialsProvider())
+                .withRegion(Regions.US_WEST_1).build();
     }
 
     public Cluster buildCluster() {
@@ -81,7 +76,8 @@ class Recipe1 implements Recipe {
         if (!cluster.isPresent()) {
             logger.info("creating cluster {}", spec.clusterName);
 
-            CreateClusterRequest request = new CreateClusterRequest().withClusterName(spec.clusterName);
+            CreateClusterRequest request = new CreateClusterRequest()
+                    .withClusterName(spec.clusterName);
 
             CreateClusterResult result = ecs.createCluster(request);
             cluster = Optional.of(result.getCluster());
@@ -93,6 +89,14 @@ class Recipe1 implements Recipe {
     }
 
     public List<String> bootZooKeeper(Cluster cluster) {
+        // are there enough containers?
+        int servers = cluster.getRegisteredContainerInstancesCount();
+
+        RegisterContainerInstanceRequest request = new RegisterContainerInstanceRequest()
+                .withCluster(cluster.getClusterArn())
+                .withContainerInstanceArn("");
+
+        ecs.registerContainerInstance(request);
         return null;
     }
 
