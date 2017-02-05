@@ -33,6 +33,7 @@ dependencies {
     compile 'com.amazonaws:aws-java-sdk-s3'
     compile 'com.amazonaws:aws-java-sdk-ecs'
     compile 'com.amazonaws:aws-java-sdk-ec2'
+    compile 'com.amazonaws:aws-java-sdk-iam'
     compile 'com.beust:jcommander:1.60'
     compile 'org.slf4j:slf4j-api:1.7.21'
 

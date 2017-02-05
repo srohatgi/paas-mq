@@ -12,4 +12,10 @@ public interface Recipe {
     List<String> bootZooKeeper(Cluster cluster);
 
     void bootKafka(Cluster cluster, List<String> zkIps);
+
+    default void execute() {
+        Cluster cluster = buildCluster();
+        List<String> zkIps = bootZooKeeper(cluster);
+        bootKafka(cluster, zkIps);
+    }
 }
